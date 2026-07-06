@@ -124,6 +124,16 @@
   break-inside: avoid;
 }
 
+/* Right-side TOC: fold nested heading lists; only the section being read
+ * stays open (Material's scroll tracking sets --active/--passed classes, so
+ * the fold follows the reader). Top-level entries are always visible. */
+.md-nav--secondary .md-nav__item > nav.md-nav {
+  display: none;
+}
+.md-nav--secondary .md-nav__item:has(.md-nav__link--active) > nav.md-nav {
+  display: block;
+}
+
 /* Keep the header flat and calm */
 .md-header {
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.12);
