@@ -31,6 +31,18 @@ updated: 2026-01-01T00:00
 
 Canonical: [[Raft consensus]]. Alias: [[Raft]]. Person alias: [[Ada]].
 Project alias: [[Meridian KV]]. Broken: [[Nonexistent page]].
+
+Intro paragraph directly followed by a list
+- glued one
+- glued two
+
+Already separated
+- fine as is
+
+```
+code paragraph
+- not a list item
+```
 """
 
 
@@ -63,6 +75,15 @@ def main():
         assert "unresolved wikilink [[Nonexistent page]]" in proc.stdout, \
             "broken link was silently swallowed"
         assert "Nonexistent page" in page and "[[Nonexistent" not in page
+
+        # list normalization: blank line inserted after a bare paragraph,
+        # existing spacing and fenced code untouched, frontmatter untouched
+        assert "followed by a list\n\n- glued one\n- glued two" in page, page
+        assert "Already separated\n\n- fine as is" in page
+        assert "code paragraph\n- not a list item" in page, "fence was modified"
+        raft_out = (out / "concepts" / "raft-consensus.md").read_text(encoding="utf-8")
+        assert raft_out.startswith("---\ntype: concept\naliases:\n  - Raft\n"), \
+            "frontmatter was modified"
 
         # strict mode must fail the build on the broken link
         strict = subprocess.run(

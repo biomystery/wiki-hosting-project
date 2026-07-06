@@ -29,6 +29,8 @@ import yaml
 FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 # [[target]] | [[target|display]] | [[target#heading]] | [[target#heading|display]]
 WIKILINK_RE = re.compile(r"\[\[([^\]\[|#]+)(?:#([^\]\[|]+))?(?:\|([^\]\[]+))?\]\]")
+LIST_ITEM_RE = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+\S")
+FENCE_RE = re.compile(r"^\s*(?:```|~~~)")
 
 
 def slugify(name):
@@ -93,6 +95,32 @@ def build_registry(pages):
     return registry
 
 
+def normalize_lists(text):
+    """Insert the blank line python-markdown needs before a list that directly
+    follows a paragraph (Obsidian doesn't require one, so vaults omit it).
+    Leaves frontmatter, fenced code blocks, consecutive list items, and
+    indented continuation lines alone."""
+    m = FRONTMATTER_RE.match(text)
+    head, body = (text[: m.end()], text[m.end():]) if m else ("", text)
+
+    out = []
+    in_fence = False
+    for line in body.split("\n"):
+        if FENCE_RE.match(line):
+            in_fence = not in_fence
+        elif (
+            not in_fence
+            and LIST_ITEM_RE.match(line)
+            and out
+            and out[-1].strip()
+            and not out[-1][0].isspace()      # continuation lines are indented
+            and not LIST_ITEM_RE.match(out[-1])
+        ):
+            out.append("")
+        out.append(line)
+    return head + "\n".join(out)
+
+
 def relative_url(from_page, to_page, anchor=None):
     rel = os.path.relpath(str(to_page["out_rel"]), str(from_page["out_rel"].parent))
     url = rel.replace(os.sep, "/")
@@ -134,7 +162,7 @@ def main():
 
         return WIKILINK_RE.sub(sub, page["raw"])
 
-    rendered = {str(p["out_rel"]): render(p) for p in pages}
+    rendered = {str(p["out_rel"]): normalize_lists(render(p)) for p in pages}
 
     for page in pages:
         body = rendered[str(page["out_rel"])]
