@@ -31,6 +31,27 @@ FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 WIKILINK_RE = re.compile(r"\[\[([^\]\[|#]+)(?:#([^\]\[|]+))?(?:\|([^\]\[]+))?\]\]")
 LIST_ITEM_RE = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+\S")
 FENCE_RE = re.compile(r"^\s*(?:```|~~~)")
+CALLOUT_RE = re.compile(r"^>\s*\[!([A-Za-z]+)\]([+-]?)\s*(.*)$")
+
+# Obsidian callout types and aliases (obsidian.md/help/callouts) -> Material
+# admonition types. Material's set mirrors Obsidian's, so mapping is mostly
+# identity plus the documented aliases. 'todo' has no Material equivalent and
+# renders closest as 'info'.
+CALLOUT_TYPES = {
+    "note": "note",
+    "abstract": "abstract", "summary": "abstract", "tldr": "abstract",
+    "info": "info",
+    "todo": "info",
+    "tip": "tip", "hint": "tip", "important": "tip",
+    "success": "success", "check": "success", "done": "success",
+    "question": "question", "help": "question", "faq": "question",
+    "warning": "warning", "caution": "warning", "attention": "warning",
+    "failure": "failure", "fail": "failure", "missing": "failure",
+    "danger": "danger", "error": "danger",
+    "bug": "bug",
+    "example": "example",
+    "quote": "quote", "cite": "quote",
+}
 
 
 def slugify(name):
@@ -93,6 +114,64 @@ def build_registry(pages):
         for alias in aliases:
             register(alias, page)
     return registry
+
+
+def convert_callouts(text):
+    """Rewrite Obsidian callouts to Material admonitions.
+
+    > [!type] Title      ->  !!! type "Title"        (plus 4-space body indent)
+    > [!type]- Title     ->  ??? type "Title"        (foldable, collapsed)
+    > [!type]+ Title     ->  ???+ type "Title"       (foldable, expanded)
+
+    Aliases map per CALLOUT_TYPES; unknown types pass through (Material styles
+    them like 'note'). Nested callouts convert recursively. Plain blockquotes
+    and code fences are untouched.
+    """
+    m = FRONTMATTER_RE.match(text)
+    head, body = (text[: m.end()], text[m.end():]) if m else ("", text)
+
+    lines = body.split("\n")
+    out = []
+    in_fence = False
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if FENCE_RE.match(line):
+            in_fence = not in_fence
+        callout = None if in_fence else CALLOUT_RE.match(line)
+        if callout is None:
+            out.append(line)
+            i += 1
+            continue
+
+        raw_type, fold, title = callout.groups()
+        adm_type = CALLOUT_TYPES.get(raw_type.lower(), raw_type.lower())
+        inner = []
+        i += 1
+        while i < len(lines) and lines[i].startswith(">"):
+            stripped = lines[i][1:]
+            if stripped.startswith(" "):
+                stripped = stripped[1:]
+            inner.append(stripped)
+            i += 1
+
+        marker = {"": "!!!", "-": "???", "+": "???+"}[fold]
+        title = title.strip().replace('"', "'")
+        if title:
+            header = '{} {} "{}"'.format(marker, adm_type, title)
+        elif adm_type != raw_type.lower():
+            # keep the author's word as the visible title (e.g. [!tldr])
+            header = '{} {} "{}"'.format(marker, adm_type, raw_type.capitalize())
+        else:
+            header = "{} {}".format(marker, adm_type)
+
+        if out and out[-1].strip():
+            out.append("")
+        out.append(header)
+        for inner_line in convert_callouts("\n".join(inner)).split("\n"):
+            out.append(("    " + inner_line).rstrip())
+        out.append("")
+    return head + "\n".join(out)
 
 
 def normalize_lists(text):
@@ -162,7 +241,10 @@ def main():
 
         return WIKILINK_RE.sub(sub, page["raw"])
 
-    rendered = {str(p["out_rel"]): normalize_lists(render(p)) for p in pages}
+    rendered = {
+        str(p["out_rel"]): normalize_lists(convert_callouts(render(p)))
+        for p in pages
+    }
 
     for page in pages:
         body = rendered[str(page["out_rel"])]

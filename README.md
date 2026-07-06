@@ -59,7 +59,9 @@ vault (Obsidian .md) ──resolver──▶ docs/ (standard Markdown) ──mkd
 1. **`resolver/resolve_links.py`** (pre-build, ~150 lines): builds a link-target
    registry from every page's filename **and** its frontmatter `aliases:`, then
    rewrites `[[Target]]`, `[[Target|display]]`, `[[Target#Heading]]` into
-   standard relative Markdown links. It slugifies paths (`Raft consensus.md` →
+   standard relative Markdown links, converts Obsidian callouts (all documented
+   types, aliases, and foldable `[!type]-` / `[!type]+` forms) to Material
+   admonitions, and slugifies paths (`Raft consensus.md` →
    `/concepts/raft-consensus/`), appends a **Backlinks** section to every linked
    page, and prints a `WARNING` per unresolved wikilink in the build log —
    `--strict` / `STRICT_LINKS=1` turns those into build failures.

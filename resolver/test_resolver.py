@@ -43,6 +43,23 @@ Already separated
 code paragraph
 - not a list item
 ```
+
+> [!note]
+> plain note body
+
+> [!tldr] Key points
+> alias with title and a [[Raft]] link
+
+> [!warning]- Folded away
+> hidden until clicked
+
+> [!error]+ Shown but foldable
+> expanded body
+
+> [!todo]
+> no direct Material type
+
+> a plain blockquote, not a callout
 """
 
 
@@ -84,6 +101,14 @@ def main():
         raft_out = (out / "concepts" / "raft-consensus.md").read_text(encoding="utf-8")
         assert raft_out.startswith("---\ntype: concept\naliases:\n  - Raft\n"), \
             "frontmatter was modified"
+
+        # callouts -> Material admonitions
+        assert "!!! note\n    plain note body" in page, page
+        assert '!!! abstract "Key points"\n    alias with title and a [Raft](raft-consensus.md) link' in page
+        assert '??? warning "Folded away"\n    hidden until clicked' in page
+        assert '???+ danger "Shown but foldable"\n    expanded body' in page
+        assert '!!! info "Todo"\n    no direct Material type' in page
+        assert "> a plain blockquote, not a callout" in page, "plain quote was mangled"
 
         # strict mode must fail the build on the broken link
         strict = subprocess.run(

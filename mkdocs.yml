@@ -30,6 +30,9 @@ extra_css:
 
 markdown_extensions:
   - tables
+  - admonition            # Obsidian callouts arrive as !!! admonitions
+  - pymdownx.details      # foldable callouts ([!type]- / [!type]+) as ???/???+
+  - pymdownx.superfences  # code blocks inside admonitions
   - toc:
       permalink: true
 
