@@ -75,6 +75,37 @@ Why a custom resolver instead of `mkdocs-roamlinks` / `ezlinks` /
 `Raft consensus.md`), which is a hard requirement here. One small, tested script
 replaces plugin + patch-script.
 
+## Theming
+
+All styling lives in **`theme/`** (an input folder, like the vault): brand
+colors, fonts, and layout tweaks in `theme/extra.css`, self-hosted webfonts in
+`theme/fonts/`. It's copied into the site at build time — edit and rebuild, no
+other wiring. The site makes zero external requests (fonts included).
+
+Layout: per-page table of contents in the right sidebar, folder navigation on
+the left with all sections collapsed by default. Set the header title per
+deployment with `SITE_NAME="Team Wiki" ./build-site.sh ...` (or
+`--build-arg SITE_NAME=...`).
+
+## Automating rebuilds
+
+`deploy/update-wiki.sh` pulls the content repo and rebuilds **only when there
+are new commits** (lock-protected, safe for cron):
+
+```sh
+deploy/update-wiki.sh /path/to/content-repo wiki /path/to/output-dir
+deploy/update-wiki.sh --force ...   # rebuild without new commits (e.g. after theme changes)
+```
+
+Cron example, every 10 minutes:
+
+```
+*/10 * * * * /home/ubuntu/wiki-hosting-project/deploy/update-wiki.sh /home/ubuntu/sbt-kg-wiki wiki /home/ubuntu/data/sbt-kg-wiki >> /home/ubuntu/log/wiki-update.log 2>&1
+```
+
+The output dir is refreshed in place (deleted pages cleaned up) and re-chmodded
+world-readable, so an nginx bind mount picks up changes with no restart.
+
 ## Tests
 
 ```sh

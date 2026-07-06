@@ -28,6 +28,10 @@ docker buildx build \
   --target site \
   --output "type=local,dest=$OUT" \
   --build-context "vault=$VAULT" \
+  --build-arg "SITE_NAME=${SITE_NAME:-Wiki}" \
   "$(cd "$(dirname "$0")" && pwd)"
+
+# nginx in a container typically runs as a non-root uid; make sure it can read
+chmod -R a+rX "$OUT_ABS"
 
 echo "Static site written to: $OUT"

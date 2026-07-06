@@ -21,13 +21,20 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY resolver/resolve_links.py resolver/
 COPY mkdocs.yml .
+COPY theme/ theme/
 COPY --from=vault / vault/
+
+# Site title shown in the header; override per deployment:
+#   docker buildx build --build-arg SITE_NAME="Team Wiki" ...
+ARG SITE_NAME=Wiki
+ENV WIKI_SITE_NAME=$SITE_NAME
 
 # resolve_links.py rewrites [[wikilinks]] (incl. frontmatter aliases) to real
 # relative links and prints a WARNING per unresolved link. `mkdocs build
 # --strict` then fails the image build on any broken resulting link, so link
 # rot is visible here, never silently swallowed.
 RUN python resolver/resolve_links.py vault docs \
+ && cp -r theme docs/_theme \
  && mkdocs build --strict
 
 # --- Optional target: export the static HTML only ---------------------------
