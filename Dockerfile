@@ -30,7 +30,13 @@ COPY --from=vault / vault/
 RUN python resolver/resolve_links.py vault docs \
  && mkdocs build --strict
 
-# --- Stage 2: serve the static site -----------------------------------------
+# --- Optional target: export the static HTML only ---------------------------
+# For serving from an existing nginx (no wiki container), write site/ to a
+# local folder:   ./build-site.sh /path/to/vault /path/to/output
+FROM scratch AS site
+COPY --from=build /build/site /
+
+# --- Default target: serve the static site ----------------------------------
 FROM nginx:1.27-alpine
 COPY --from=build /build/site /usr/share/nginx/html
 EXPOSE 80

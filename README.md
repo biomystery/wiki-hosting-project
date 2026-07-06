@@ -18,6 +18,21 @@ open http://127.0.0.1:8090/
 
 Default content is the `sample-wiki/` fixture.
 
+## Static-HTML export (serve from your own nginx)
+
+If you already run a web server and just want the rendered files — no wiki
+container — export the built site to a folder:
+
+```sh
+./build-site.sh /path/to/vault /path/to/output-dir
+```
+
+Mount the output dir into your nginx (e.g. `- ./wiki_html:/wiki/:ro`) and add a
+`location /wiki/ { alias /wiki/; index index.html; }` block behind whatever
+auth you use (`auth_request`, oauth2-proxy, ...). MkDocs output is fully
+relative, so any path prefix works. Re-run the script after content changes —
+nginx picks up the new files with no restart.
+
 ## Swapping in the real vault
 
 The vault is a named build context — **one path, no code change**:
