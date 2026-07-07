@@ -28,6 +28,9 @@ plugins:
 extra_css:
   - _theme/extra.css   # theme/ is copied to docs/_theme at build time
 
+extra_javascript:
+  - _theme/graph.js    # interactive link graph (full page + sidebar panel)
+
 markdown_extensions:
   - tables
   - admonition            # Obsidian callouts arrive as !!! admonitions

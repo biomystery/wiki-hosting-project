@@ -19,6 +19,7 @@ and never renders it into the page body.
 Usage: resolve_links.py SRC_DIR OUT_DIR [--strict]
 """
 
+import json
 import os
 import re
 import sys
@@ -200,6 +201,53 @@ def normalize_lists(text):
     return head + "\n".join(out)
 
 
+GRAPH_PAGE = """# Graph
+
+Every page is a node; wikilinks are edges. Drag nodes, scroll to zoom, click
+to open a page.
+
+<div id="wiki-graph-full"></div>
+"""
+
+
+def page_url(page):
+    """Site-root-relative URL of a page under use_directory_urls."""
+    rel = page["out_rel"].as_posix()
+    if rel == "index.md" or rel.endswith("/index.md"):
+        return rel[: -len("index.md")]   # index pages serve at their directory
+    return rel[:-3] + "/"
+
+
+def write_graph(pages, backlinks, out_root):
+    """Emit graph.json (nodes + directed edges) and the full-graph page."""
+    index = {str(p["out_rel"]): i for i, p in enumerate(pages)}
+    # undirected + deduped: mutual links would otherwise double the drawn
+    # line and the spring force between the pair
+    edges = sorted(
+        set(
+            (min(index[src], index[target]), max(index[src], index[target]))
+            for target, sources in backlinks.items()
+            for src in sources
+        )
+    )
+    edges = [list(e) for e in edges]
+    nodes = [
+        {
+            "title": p["title"],
+            "url": page_url(p),
+            "type": str(p["meta"].get("type") or "").lower(),
+        }
+        for p in pages
+    ]
+    (out_root / "graph.json").write_text(
+        json.dumps({"nodes": nodes, "edges": edges}), encoding="utf-8"
+    )
+    if any(p["out_rel"].as_posix() == "graph.md" for p in pages):
+        print("WARNING: vault has its own root graph.md; skipping generated graph page")
+        return
+    (out_root / "graph.md").write_text(GRAPH_PAGE, encoding="utf-8")
+
+
 def relative_url(from_page, to_page, anchor=None):
     rel = os.path.relpath(str(to_page["out_rel"]), str(from_page["out_rel"].parent))
     url = rel.replace(os.sep, "/")
@@ -258,6 +306,8 @@ def main():
         out_path = out_root / page["out_rel"]
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(body, encoding="utf-8")
+
+    write_graph(pages, backlinks, out_root)
 
     for rel, link in unresolved:
         print("WARNING: unresolved wikilink {} in {}".format(link, rel))
