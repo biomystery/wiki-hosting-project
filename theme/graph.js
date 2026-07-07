@@ -99,7 +99,59 @@
     panel.appendChild(box);
     wrap.insertBefore(panel, wrap.firstChild);
 
-    initGraph(box, sub, { height: 170, focus: remap[cur], mini: true });
+    initGraph(box, sub, {
+      height: 170,
+      focus: remap[cur],
+      mini: true,
+      onExpand: function () {
+        openLocalPopup(sub, remap[cur], data.nodes[cur].title);
+      },
+    });
+  }
+
+  /* Enlarged local graph in a modal — same 1-hop subgraph as the panel,
+   * with full pan/zoom and click-to-open. Closes on x, Escape, backdrop. */
+  function openLocalPopup(sub, focus, title) {
+    if (document.querySelector(".wiki-graph-modal")) return;
+    var overlay = document.createElement("div");
+    overlay.className = "wiki-graph-modal";
+    var box = document.createElement("div");
+    box.className = "wiki-graph-modal__box";
+    var head = document.createElement("div");
+    head.className = "wiki-graph-modal__head";
+    var label = document.createElement("span");
+    label.className = "wiki-graph-modal__title";
+    label.textContent = "Local graph · " + title;
+    var close = document.createElement("button");
+    close.className = "wiki-graph-modal__close";
+    close.setAttribute("aria-label", "Close graph");
+    close.textContent = "×";
+    head.appendChild(label);
+    head.appendChild(close);
+    var body = document.createElement("div");
+    box.appendChild(head);
+    box.appendChild(body);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    function destroy() {
+      document.removeEventListener("keydown", onKey);
+      overlay.remove(); // disconnects the canvas; its sim loop exits itself
+    }
+    function onKey(ev) {
+      if (ev.key === "Escape") destroy();
+    }
+    document.addEventListener("keydown", onKey);
+    overlay.addEventListener("pointerdown", function (ev) {
+      if (ev.target === overlay) destroy();
+    });
+    close.addEventListener("click", destroy);
+
+    initGraph(body, sub, {
+      height: Math.min(560, Math.round(window.innerHeight * 0.62)),
+      focus: focus,
+    });
+    close.focus();
   }
 
   function initGraph(container, data, opts) {
@@ -114,6 +166,10 @@
     var W = 0;
 
     function resize() {
+      if (!canvas.isConnected) {
+        window.removeEventListener("resize", resize);
+        return;
+      }
       W = container.clientWidth || 300;
       canvas.width = W * dpr;
       canvas.height = H * dpr;
@@ -279,7 +335,7 @@
       } else if (!opts.mini) {
         pan = { x: ev.clientX, y: ev.clientY };
       }
-      canvas.setPointerCapture(ev.pointerId);
+      try { canvas.setPointerCapture(ev.pointerId); } catch (e) { /* synthetic events */ }
     });
     canvas.addEventListener("pointermove", function (ev) {
       if (drag) {
@@ -293,14 +349,21 @@
         pan = { x: ev.clientX, y: ev.clientY };
       } else {
         var i = pick(ev);
-        if (i !== hover) { hover = i; canvas.style.cursor = i === -1 ? "default" : "pointer"; }
+        if (i !== hover) {
+          hover = i;
+          canvas.style.cursor = opts.onExpand
+            ? "zoom-in"                          // whole mini graph is a button
+            : i === -1 ? "default" : "pointer";
+        }
       }
       if (!running) draw();
     });
-    canvas.addEventListener("pointerup", function (ev) {
-      if (drag && !drag.moved) {
-        var url = nodes[drag.idx].d.url;
-        if (drag.idx !== opts.focus) location.href = new URL(url, base).href;
+    canvas.addEventListener("pointerup", function () {
+      if (opts.onExpand) {
+        // mini panel: any tap that wasn't a node-drag opens the popup
+        if (!(drag && drag.moved)) opts.onExpand();
+      } else if (drag && !drag.moved && drag.idx !== opts.focus) {
+        location.href = new URL(nodes[drag.idx].d.url, base).href;
       }
       drag = null;
       pan = null;

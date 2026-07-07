@@ -164,6 +164,52 @@
   color: var(--sb-burgundy);
 }
 
+/* Enlarged local-graph popup (opened by clicking the sidebar mini graph) */
+.wiki-graph-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  background: rgba(26, 26, 26, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.wiki-graph-modal__box {
+  background: #fff;
+  width: min(780px, 92vw);
+  border: 1px solid var(--sb-periwinkle);
+  border-radius: 6px;
+  box-shadow: 0 12px 40px rgba(26, 26, 26, 0.25);
+}
+.wiki-graph-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.45rem 0.5rem 0.3rem 0.8rem;
+  border-bottom: 1px solid rgba(200, 211, 236, 0.6);
+}
+.wiki-graph-modal__title {
+  font-family: var(--sb-mono);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.62rem;
+  color: rgba(26, 26, 26, 0.65);
+}
+.wiki-graph-modal__close {
+  background: none;
+  border: 0;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0.1rem 0.4rem;
+  cursor: pointer;
+  color: rgba(26, 26, 26, 0.55);
+}
+.wiki-graph-modal__close:hover,
+.wiki-graph-modal__close:focus-visible {
+  color: var(--sb-burgundy);
+}
+
 /* Keep the header flat and calm */
 .md-header {
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.12);
