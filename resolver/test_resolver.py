@@ -129,7 +129,6 @@ def main():
         assert (out / "graph.md").exists()
 
         # nested index.md serves at its directory URL, not .../index/
-        nested = titles.index("index" if titles.count("index") == 1 else "index")
         urls = {n["title"]: n["url"] for n in graph["nodes"]}
         assert "projects/" in [n["url"] for n in graph["nodes"]], urls
         assert not any(u.endswith("/index/") for u in urls.values()), urls
