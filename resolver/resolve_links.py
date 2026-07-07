@@ -213,19 +213,24 @@ to open a page.
 def page_url(page):
     """Site-root-relative URL of a page under use_directory_urls."""
     rel = page["out_rel"].as_posix()
-    if rel == "index.md":
-        return ""
+    if rel == "index.md" or rel.endswith("/index.md"):
+        return rel[: -len("index.md")]   # index pages serve at their directory
     return rel[:-3] + "/"
 
 
 def write_graph(pages, backlinks, out_root):
     """Emit graph.json (nodes + directed edges) and the full-graph page."""
     index = {str(p["out_rel"]): i for i, p in enumerate(pages)}
+    # undirected + deduped: mutual links would otherwise double the drawn
+    # line and the spring force between the pair
     edges = sorted(
-        (index[src], index[target])
-        for target, sources in backlinks.items()
-        for src in sources
+        set(
+            (min(index[src], index[target]), max(index[src], index[target]))
+            for target, sources in backlinks.items()
+            for src in sources
+        )
     )
+    edges = [list(e) for e in edges]
     nodes = [
         {
             "title": p["title"],

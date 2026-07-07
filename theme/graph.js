@@ -167,7 +167,7 @@
         n.x += n.vx * alpha;
         n.y += n.vy * alpha;
       });
-      alpha = Math.max(0.03, alpha * 0.996);
+      alpha *= 0.99;
     }
 
     function radius(n) {
@@ -229,17 +229,33 @@
       });
     }
 
+    // The simulation settles and STOPS (alpha decays below threshold); any
+    // interaction reheats it via kick(). No perpetual O(N^2) rAF loop.
+    var ALPHA_STOP = 0.02;
+    var running = false;
+    function loop() {
+      tick();
+      draw();
+      if (!canvas.isConnected || (alpha < ALPHA_STOP && !drag && !pan)) {
+        running = false;
+        return;
+      }
+      requestAnimationFrame(loop);
+    }
+    function kick(heat) {
+      alpha = Math.max(alpha, heat);
+      if (!running && !reduced) {
+        running = true;
+        requestAnimationFrame(loop);
+      }
+    }
     var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (reduced) {
-      for (var s = 0; s < 300; s++) tick();
+      for (var s = 0; s < 400; s++) tick();
       resize();
     } else {
       resize();
-      (function loop() {
-        tick();
-        draw();
-        if (canvas.isConnected) requestAnimationFrame(loop);
-      })();
+      kick(1);
     }
 
     // --- interactions -----------------------------------------------------
@@ -259,7 +275,7 @@
       var i = pick(ev);
       if (i !== -1) {
         drag = { node: nodes[i], moved: false, idx: i };
-        alpha = Math.max(alpha, 0.5);
+        kick(0.5);
       } else if (!opts.mini) {
         pan = { x: ev.clientX, y: ev.clientY };
       }
@@ -270,7 +286,7 @@
         drag.moved = true;
         drag.node.x += ev.movementX / view.k;
         drag.node.y += ev.movementY / view.k;
-        alpha = Math.max(alpha, 0.3);
+        kick(0.3);
       } else if (pan) {
         view.x += (ev.clientX - pan.x) / view.k;
         view.y += (ev.clientY - pan.y) / view.k;
@@ -279,7 +295,7 @@
         var i = pick(ev);
         if (i !== hover) { hover = i; canvas.style.cursor = i === -1 ? "default" : "pointer"; }
       }
-      if (reduced) draw();
+      if (!running) draw();
     });
     canvas.addEventListener("pointerup", function (ev) {
       if (drag && !drag.moved) {
@@ -289,13 +305,13 @@
       drag = null;
       pan = null;
     });
-    canvas.addEventListener("pointerleave", function () { hover = -1; if (reduced) draw(); });
+    canvas.addEventListener("pointerleave", function () { hover = -1; if (!running) draw(); });
     if (!opts.mini) {
       canvas.addEventListener("wheel", function (ev) {
         ev.preventDefault();
         var k = Math.min(4, Math.max(0.25, view.k * (ev.deltaY < 0 ? 1.12 : 0.89)));
         view.k = k;
-        if (reduced) draw();
+        if (!running) draw();
       }, { passive: false });
     }
   }

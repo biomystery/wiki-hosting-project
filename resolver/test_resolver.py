@@ -69,6 +69,12 @@ def main():
         vault = tmp / "vault"
         shutil.copytree(FIXTURE, vault)
         (vault / "concepts" / "Alias exercise.md").write_text(EXTRA_PAGE, encoding="utf-8")
+        (vault / "projects" / "index.md").write_text(
+            "---\ntype: MOC\naliases: [projects index]\ntags: [wiki]\n"
+            "created: 2026-01-01T00:00\nupdated: 2026-01-01T00:00\n---\n"
+            "# Projects\n\nSee [[Meridian]].\n",
+            encoding="utf-8",
+        )
 
         out = tmp / "docs"
         proc = subprocess.run(
@@ -114,13 +120,40 @@ def main():
         import json
         graph = json.loads((out / "graph.json").read_text(encoding="utf-8"))
         titles = [n["title"] for n in graph["nodes"]]
-        assert len(graph["nodes"]) == 14, titles
+        assert len(graph["nodes"]) == 15, titles
         raft = titles.index("Raft consensus")
         exercise = titles.index("Alias exercise")
-        assert [exercise, raft] in graph["edges"], "alias link missing from graph"
+        assert sorted([exercise, raft]) in graph["edges"], "alias link missing from graph"
         assert graph["nodes"][raft]["url"] == "concepts/raft-consensus/"
         assert graph["nodes"][raft]["type"] == "concept"
         assert (out / "graph.md").exists()
+
+        # nested index.md serves at its directory URL, not .../index/
+        nested = titles.index("index" if titles.count("index") == 1 else "index")
+        urls = {n["title"]: n["url"] for n in graph["nodes"]}
+        assert "projects/" in [n["url"] for n in graph["nodes"]], urls
+        assert not any(u.endswith("/index/") for u in urls.values()), urls
+
+        # mutual wikilinks are deduped to one undirected edge
+        assert len(graph["edges"]) == len({tuple(e) for e in graph["edges"]})
+        assert all(e[0] < e[1] for e in graph["edges"]), "edges not canonicalized"
+
+        # a vault owning a root graph.md keeps its page; graph.json still emitted
+        own = tmp / "own-graph"
+        (own / "concepts").mkdir(parents=True)
+        (own / "graph.md").write_text("# My own graph page\n", encoding="utf-8")
+        (own / "concepts" / "Solo.md").write_text("# Solo\n\nSee [[graph]].\n", encoding="utf-8")
+        own_out = tmp / "own-out"
+        own_run = subprocess.run(
+            [sys.executable, str(ROOT / "resolver" / "resolve_links.py"), str(own), str(own_out)],
+            capture_output=True, text=True,
+        )
+        assert own_run.returncode == 0, own_run.stderr
+        assert "skipping generated graph page" in own_run.stdout, own_run.stdout
+        own_page = (own_out / "graph.md").read_text(encoding="utf-8")
+        assert own_page.startswith("# My own graph page"), own_page
+        assert "wiki-graph-full" not in own_page, "vault's graph.md was clobbered"
+        assert (own_out / "graph.json").exists()
 
         # strict mode must fail the build on the broken link
         strict = subprocess.run(
