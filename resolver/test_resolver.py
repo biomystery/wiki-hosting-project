@@ -110,6 +110,18 @@ def main():
         assert '!!! info "Todo"\n    no direct Material type' in page
         assert "> a plain blockquote, not a callout" in page, "plain quote was mangled"
 
+        # graph emitted: every page is a node, edges follow wikilinks
+        import json
+        graph = json.loads((out / "graph.json").read_text(encoding="utf-8"))
+        titles = [n["title"] for n in graph["nodes"]]
+        assert len(graph["nodes"]) == 14, titles
+        raft = titles.index("Raft consensus")
+        exercise = titles.index("Alias exercise")
+        assert [exercise, raft] in graph["edges"], "alias link missing from graph"
+        assert graph["nodes"][raft]["url"] == "concepts/raft-consensus/"
+        assert graph["nodes"][raft]["type"] == "concept"
+        assert (out / "graph.md").exists()
+
         # strict mode must fail the build on the broken link
         strict = subprocess.run(
             [sys.executable, str(ROOT / "resolver" / "resolve_links.py"),
