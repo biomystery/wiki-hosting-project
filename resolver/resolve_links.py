@@ -19,6 +19,7 @@ and never renders it into the page body.
 Usage: resolve_links.py SRC_DIR OUT_DIR [--strict]
 """
 
+import html
 import json
 import os
 import re
@@ -175,6 +176,40 @@ def convert_callouts(text):
     return head + "\n".join(out)
 
 
+def inject_frontmatter_url(text, meta):
+    """Render the frontmatter `url:` field (string or list) as clickable
+    links directly under the page title. Frontmatter itself is page metadata
+    and never reaches the HTML, so without this the URL is silently lost."""
+    urls = meta.get("url") or meta.get("URL")
+    if not urls:
+        return text
+    if isinstance(urls, str):
+        urls = [urls]
+    anchors = []
+    for u in urls:
+        u = str(u).strip()
+        if not u:
+            continue
+        href = u if re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:", u) else "https://" + u
+        anchors.append(
+            '<a href="{}" target="_blank" rel="noopener">{}</a>'.format(
+                html.escape(href, quote=True), html.escape(u)
+            )
+        )
+    if not anchors:
+        return text
+    block = '<p class="wiki-page-url">' + " · ".join(anchors) + "</p>"
+
+    m = FRONTMATTER_RE.match(text)
+    head, body = (text[: m.end()], text[m.end():]) if m else ("", text)
+    lines = body.split("\n")
+    for i, line in enumerate(lines):
+        if line.startswith("# "):   # after the H1 title if the page has one
+            lines.insert(i + 1, "\n" + block)
+            return head + "\n".join(lines)
+    return head + block + "\n\n" + body
+
+
 def normalize_lists(text):
     """Insert the blank line python-markdown needs before a list that directly
     follows a paragraph (Obsidian doesn't require one, so vaults omit it).
@@ -290,7 +325,9 @@ def main():
         return WIKILINK_RE.sub(sub, page["raw"])
 
     rendered = {
-        str(p["out_rel"]): normalize_lists(convert_callouts(render(p)))
+        str(p["out_rel"]): inject_frontmatter_url(
+            normalize_lists(convert_callouts(render(p))), p["meta"]
+        )
         for p in pages
     }
 

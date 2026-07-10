@@ -134,6 +134,18 @@
   display: block;
 }
 
+/* Frontmatter url: rendered under the page title by the resolver */
+.md-typeset .wiki-page-url {
+  font-family: var(--sb-mono);
+  font-size: 0.68rem;
+  margin: -0.6rem 0 1.4rem;
+  word-break: break-all;
+}
+.md-typeset .wiki-page-url a::after {
+  content: " ↗";
+  font-size: 0.9em;
+}
+
 /* Interactive link graph (theme/graph.js) */
 .wiki-graph-canvas {
   display: block;

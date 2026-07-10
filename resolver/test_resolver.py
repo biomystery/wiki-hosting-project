@@ -69,6 +69,20 @@ def main():
         vault = tmp / "vault"
         shutil.copytree(FIXTURE, vault)
         (vault / "concepts" / "Alias exercise.md").write_text(EXTRA_PAGE, encoding="utf-8")
+        (vault / "refs" / "Linked ref.md").write_text(
+            "---\ntype: reference\naliases: [linkedref]\n"
+            "url: https://example.com/paper?id=1&sec=2\ntags: [wiki]\n"
+            "created: 2026-01-01T00:00\nupdated: 2026-01-01T00:00\n---\n"
+            "# Linked ref\n\nBody about [[Raft]].\n",
+            encoding="utf-8",
+        )
+        (vault / "refs" / "Multi url ref.md").write_text(
+            "---\ntype: reference\naliases: [multiurl]\nurl:\n"
+            "  - www.example.org/a\n  - https://example.org/b\ntags: [wiki]\n"
+            "created: 2026-01-01T00:00\nupdated: 2026-01-01T00:00\n---\n"
+            "No title heading here.\n",
+            encoding="utf-8",
+        )
         (vault / "projects" / "index.md").write_text(
             "---\ntype: MOC\naliases: [projects index]\ntags: [wiki]\n"
             "created: 2026-01-01T00:00\nupdated: 2026-01-01T00:00\n---\n"
@@ -120,7 +134,7 @@ def main():
         import json
         graph = json.loads((out / "graph.json").read_text(encoding="utf-8"))
         titles = [n["title"] for n in graph["nodes"]]
-        assert len(graph["nodes"]) == 15, titles
+        assert len(graph["nodes"]) == 17, titles
         raft = titles.index("Raft consensus")
         exercise = titles.index("Alias exercise")
         assert sorted([exercise, raft]) in graph["edges"], "alias link missing from graph"
@@ -153,6 +167,23 @@ def main():
         assert own_page.startswith("# My own graph page"), own_page
         assert "wiki-graph-full" not in own_page, "vault's graph.md was clobbered"
         assert (own_out / "graph.json").exists()
+
+        # frontmatter url: rendered as a clickable link under the title
+        ref = (out / "refs" / "linked-ref.md").read_text(encoding="utf-8")
+        assert (
+            '<p class="wiki-page-url">'
+            '<a href="https://example.com/paper?id=1&amp;sec=2" '
+            'target="_blank" rel="noopener">https://example.com/paper?id=1&amp;sec=2</a></p>'
+        ) in ref, ref
+        assert ref.index("# Linked ref") < ref.index("wiki-page-url"), \
+            "url block should follow the H1"
+        multi = (out / "refs" / "multi-url-ref.md").read_text(encoding="utf-8")
+        assert '<a href="https://www.example.org/a"' in multi, multi   # scheme added
+        assert '<a href="https://example.org/b"' in multi
+        assert multi.index("wiki-page-url") < multi.index("No title heading"), \
+            "without an H1 the url block leads the body"
+        assert "url: https://example.com" not in ref.split("---")[2], \
+            "url line should stay in frontmatter only"
 
         # strict mode must fail the build on the broken link
         strict = subprocess.run(
